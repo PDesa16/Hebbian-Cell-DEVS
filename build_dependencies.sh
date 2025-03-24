@@ -22,8 +22,6 @@ make -j$(nproc)
 cd "$BUILD_DIR/yaml-cpp"
 cmake .
 make -j$(nproc)
-cd "$BUILD_DIR/cryptopp"
-make -j$(nproc)
 
 # Make current DEVS project
 cd "$PROJECT_ROOT"

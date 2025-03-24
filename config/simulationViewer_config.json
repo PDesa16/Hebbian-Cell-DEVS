@@ -1,0 +1,24 @@
+{
+  "scenario": {
+    "shape": [28, 28],
+    "origin": [0, 0],
+    "wrapped": false
+  },
+  "cells": {
+    "default": {
+      "delay": "inertial",
+      "model": "Hebbian-Learning",
+      "neighborhood": [
+        { "type": "von_neumann", "range": 4 }
+      ]
+    }
+  },
+  "viewer": [
+    {
+      "colors": [[0, 0, 0], [255, 255, 255]],
+      "breaks": [-1, 1],
+      "field": "time",
+       "port": "inputNeighborhood"
+    }
+  ]
+}

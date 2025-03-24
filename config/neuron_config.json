@@ -1,0 +1,17 @@
+{
+  "scenario": {
+    "shape": [28, 28],
+    "origin": [0, 0],
+    "wrapped": false
+  },
+  "cells": {
+    "default": {
+      "delay": "inertial",
+      "model": "Hebbian-Learning",
+      "state": { "activationStatus": -1 },
+      "neighborhood": [
+        { "type": "von_neumann", "range": 20}
+      ]
+    }
+  }
+}
