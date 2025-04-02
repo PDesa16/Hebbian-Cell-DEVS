@@ -11,10 +11,10 @@ public:
 	int activationStatus;
 	int imageWidth;
 	int imageLength;
-	std::shared_ptr<WeightMatrix> localWeights;
-	std::shared_ptr<StateMatrix> neighboringStates;
 	double time;
 	double prevEnergy = 0;
+	std::shared_ptr<WeightMatrix> localWeights;
+	std::shared_ptr<StateMatrix> neighboringStates;
 	NeuronState() = default;
 };
 

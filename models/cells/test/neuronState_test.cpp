@@ -18,7 +18,7 @@ protected:
 };
 
 
-TEST_F(NeuronStateAtomicFixture, TestNeuronCellModelInit) {
+TEST_F(NeuronStateAtomicFixture, TestNeuronStateModelInit) {
     ASSERT_TRUE(1);
 }
 

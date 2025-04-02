@@ -8,7 +8,7 @@
 #include <cadmium/celldevs/grid/cell.hpp>
 #include <cadmium/celldevs/grid/config.hpp>
 #include "../../utils/stochastic/random.hpp"
-#include <cstdlib> // For abs()
+#include <cstdlib> 
 
 using namespace cadmium::celldevs;
 
@@ -30,6 +30,9 @@ public:
                 this->state.imageWidth = width;
                 this->state.time = time;
             }
+
+    // Default added for testing
+    NeuronCell() = default;
             
             [[nodiscard]] NeuronState localComputation(NeuronState state,
                 const std::unordered_map<std::vector<int>, NeighborData<NeuronState, double>>& neighborhood) const {
@@ -39,44 +42,11 @@ public:
                     // Update state
                     updateCellState(x,y,neighborhood,state);
                 }
-                // ΔE=∣Ecurrent−E prev​∣
                 // Advance time
                 state.time += RandomNumberGeneratorDEVS::generateExponentialDelay(1);
                 // Return current state which is passed to neighbors ports
                 return state;
             }
-
-            // [[nodiscard]] NeuronState localComputation(NeuronState state,
-            //     const std::unordered_map<std::vector<int>, NeighborData<NeuronState, double>>& neighborhood) const {
-            //         // Get current cell coords
-            //         auto [x, y] = GeneralUtils::stringToIndices(this->getId());
-                    
-            //         // Update cell state (modifies activationStatus)
-            //         updateCellState(x, y, neighborhood, state);
-
-            //         // Compute energy difference for convergence check
-            //         double E_prev = state.prevEnergy;
-            //         double E_current = 0.0;
-                    
-            //         for (const auto& [neighborId, neighborData] : neighborhood) {
-            //             int neighborFlatIndex = neighborId[0] * state.imageWidth + neighborId[1];
-            //             int selfFlatIndex = x * state.imageWidth + y;
-            //             E_current += -0.5 * state.localWeights->getWeightAt(selfFlatIndex, neighborFlatIndex) *
-            //                         state.activationStatus * neighborData.state->activationStatus;
-            //         }
-
-            //         // Store energy for next iteration
-            //         state.prevEnergy = E_current;
-
-            //         // Compute energy difference
-            //         double energyDiff = fabs(E_current - E_prev);
-                    
-            //         // Adaptive time update based on stability
-            //         state.time += (energyDiff < 0.001) ? 0.1 : 1.0;
-
-            //     return state;
-            // }
-
             
             bool verifyImmidiateNeighborsHaveFired(int x, int y, const std::unordered_map<std::vector<int>, NeighborData<NeuronState, double>>& neighborhood, NeuronState& state) const {
                 int WIDTH_EDGE = state.imageWidth - 1;
@@ -119,68 +89,29 @@ public:
             }
             
             
-            // void updateCellState(int x, int y ,const std::unordered_map<std::vector<int>, NeighborData<NeuronState, double>>& neighborhood, NeuronState& state) const {
-            //     // NxN matrix 
-            //     // i.e row 0 represents the product of cell 0 with every other cell including itself. 
-            //     // Each column represents the other cell i.e col 1 = cell0 * cell1, col 2 = cell0 * cell2 ... etc
-            //     double sum = 0;
-            //     int selfFlatIndex = x * state.imageWidth + y;
-            //     // Iterate through neighboring neurons
-            //     for (const auto& [neighborId, neighborData] : neighborhood) {
-            //         int neighborState = neighborData.state->activationStatus;
-            
-            //         auto neighborStringID = GeneralUtils::parseCellIndexToCadmiumId(neighborId[0], neighborId[1]);
-            //         int neighborFlatIndex = neighborId[0] * state.imageWidth + neighborId[1];
-            
-            //         // Perform update rule
-            //         if (neighborStringID != this->getId()) {
-            //             sum += state.localWeights->getWeightAt(selfFlatIndex, neighborFlatIndex) * static_cast<double>(neighborState);
-            //         }
-            //     }
-            //     // Update activation state using the sum
-            //     state.activationStatus = GeneralUtils::signum(sum);
-            //     // Set it in the global state matrix
-            //     state.neighboringStates->stateMatrix(x,y) = state.activationStatus;
-            // }
-
-            // Adaptive Weights - Oja's
-            void updateCellState(int x, int y, 
-                const std::unordered_map<std::vector<int>, NeighborData<NeuronState, double>>& neighborhood, 
-                NeuronState& state) const {
-                double sum = 0.0;
+            void updateCellState(int x, int y ,const std::unordered_map<std::vector<int>, NeighborData<NeuronState, double>>& neighborhood, NeuronState& state) const {
+                // NxN matrix 
+                // i.e row 0 represents the product of cell 0 with every other cell including itself. 
+                // Each column represents the other cell i.e col 1 = cell0 * cell1, col 2 = cell0 * cell2 ... etc
+                double sum = 0;
                 int selfFlatIndex = x * state.imageWidth + y;
-                double lambda = 0.1;  // Learning rate for Hebbian update
-                double decayFactor = 0.99; // Decay weight over time
-
                 // Iterate through neighboring neurons
                 for (const auto& [neighborId, neighborData] : neighborhood) {
-                int neighborState = neighborData.state->activationStatus;
-                int neighborFlatIndex = neighborId[0] * state.imageWidth + neighborId[1];
-
-                if (neighborFlatIndex != selfFlatIndex) {
-                    // Fetch existing weight
-                    double currentWeight = state.localWeights->getWeightAt(selfFlatIndex, neighborFlatIndex);
-
-                    // Hebbian update with decay
-                    double updatedWeight = decayFactor * currentWeight + lambda * state.activationStatus * neighborState;
-
-                    // Normalize weight to prevent divergence
-                    updatedWeight /= std::max(1.0, fabs(updatedWeight));
-
-                    // Store updated weight
-                    state.localWeights->weightMatrix(selfFlatIndex, neighborFlatIndex) =  updatedWeight;
-
-                    // Sum for activation update
-                    sum += updatedWeight * neighborState;
+                    int neighborState = neighborData.state->activationStatus;
+            
+                    auto neighborStringID = GeneralUtils::parseCellIndexToCadmiumId(neighborId[0], neighborId[1]);
+                    int neighborFlatIndex = neighborId[0] * state.imageWidth + neighborId[1];
+            
+                    // Perform update rule
+                    if (neighborStringID != this->getId()) {
+                        sum += state.localWeights->getWeightAt(selfFlatIndex, neighborFlatIndex) * static_cast<double>(neighborState);
+                    }
                 }
-                }
-
-                // Update activation state using sign function
+                // Update activation state using the sum
                 state.activationStatus = GeneralUtils::signum(sum);
-
-                // Store new state in the global state matrix
-                state.neighboringStates->stateMatrix(x, y) = state.activationStatus;
-                }
+                // Set it in the global state matrix
+                state.neighboringStates->stateMatrix(x,y) = state.activationStatus;
+            }
             
             [[nodiscard]] double outputDelay(const NeuronState& state) const {
                 return state.time;
@@ -191,28 +122,3 @@ public:
 };
 
 #endif
-
-
-
-		// bool isActive = false;
-		// // Check if neighbors are valid.. 
-		// for (const auto& [neighborId, neighborData] : neighborhood) {
-		// 	int neighborState = neighborData.state->activationStatus;
-		// 	if ( neighborState == 1 ) {
-		// 		isActive = true;
-		// 		break;
-		// 	}
-		// }
-
-		// if (isActive == false) {
-		// 	return state;
-		//  }
-
-
-		// for (int i =0; i < 28; i++){
-		// 	for (int j =0; j < 28; j++){
-		// 		sum += state.localWeights->weightMatrix[selfFlatIndex][i*28 + j] * (*state.neighboringStates)[i][j];
-		// 	}
-		// }
-
-		// (*state.neighboringStates)[index1][index2] =  state.activationStatus;
