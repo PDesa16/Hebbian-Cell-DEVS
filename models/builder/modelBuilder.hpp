@@ -11,7 +11,6 @@
 #include "../../utils/imageLoader.hpp"
 #include "../../utils/generalUtils.hpp"
 #include "../../types/imageStructures.hpp"
-#include "../../logger/EnergyLogger.hpp"
 
 class ModelBuilder {
 public:
