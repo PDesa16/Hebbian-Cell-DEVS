@@ -45,6 +45,9 @@ build_simulation:
 # Run all tests
 run_tests: $(addprefix run_, $(TESTS))
 
+run_simulation: 
+	$(BIN_DIR)/simulation
+
 run_test_neuron_state:
 	$(BIN_DIR)/test_neuron_state
 
