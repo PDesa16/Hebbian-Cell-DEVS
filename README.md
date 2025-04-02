@@ -1,5 +1,5 @@
 ## Demo  
-![Demo GIF](https://github.com/PDesa16/RAFT-DEVS/blob/main/assets/demo.gif)
+![Demo GIF](https://github.com/PDesa16/Hebbian-Cell-DEVS/blob/main/assets/demo.gif)
 
 # Project Setup and Usage
 
