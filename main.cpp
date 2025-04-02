@@ -3,25 +3,25 @@
 #include "utils/stochastic/random.hpp"
 #include "utils/generalUtils.hpp"
 
-
+// Requires global access for addGridCell Factory method
 std::vector<std::shared_ptr<ImageMatrix>> images;
 std::shared_ptr<WeightMatrix> globalWeightMatrix;
 std::shared_ptr<StateMatrix> globalStateMatrix;
+int imageSelection;
 
 std::shared_ptr<GridCell<NeuronState, double>> addGridCell(const coordinates & cellId, const std::shared_ptr<const GridCellConfig<NeuronState, double>>& cellConfig) {
     // Create a mutable copy of the original config 
     auto modifiableConfig = std::make_shared<GridCellConfig<NeuronState, double>>(*cellConfig);
-    double slightPermutation = images[3]->pixels(cellId[0], cellId[1]);
-
+    double slightPermutation = images[imageSelection]->pixels(cellId[0], cellId[1]);
     if (cellId[0] % 2 == 0){
         slightPermutation *= -1 ;
         globalStateMatrix->stateMatrix(cellId[0],cellId[1]) =  slightPermutation;
     } else {
-        globalStateMatrix->stateMatrix(cellId[0],cellId[1]) =  images[3]->pixels(cellId[0], cellId[1]);
+        globalStateMatrix->stateMatrix(cellId[0],cellId[1]) =  images[imageSelection]->pixels(cellId[0], cellId[1]);
     }
 
     if (modifiableConfig) {
-        modifiableConfig->state.activationStatus =  images[3]->pixels(cellId[0], cellId[1]);
+        modifiableConfig->state.activationStatus =  images[imageSelection]->pixels(cellId[0], cellId[1]);
     }
 
     // Example condition: if the cell model is Hebbian-Learning
@@ -39,66 +39,57 @@ std::shared_ptr<GridCell<NeuronState, double>> addGridCell(const coordinates & c
     }
 }
 
-
+// Simple function to print eigen matrix of doubles
 void printMatrix(const Eigen::MatrixXd& matrix) {
     std::cout << matrix << std::endl;
 }
+// Simple function to print eigen matrix of intergers
 void printMatrixi(const Eigen::MatrixXi& matrix) {
     std::cout << matrix << std::endl;
 }
 
-void printNeuronStatesMatrixStyle(std::shared_ptr<GridCellDEVSCoupled<NeuronState, double>> neuronCellModel, int rows, int cols) {
-    Eigen::MatrixXi stateMatrix(rows, cols); // Integer matrix for -1 and +1
-
-    auto set = neuronCellModel->getComponents();
-
-    for (const auto& comp : set) {
-        auto state = std::dynamic_pointer_cast<NeuronCell>(comp.second);
-        int value = state->getState().activationStatus ;
-        // issue here.
-        auto [index1, index2] = GeneralUtils::stringToIndices(state->getId());
-        stateMatrix(index1, index2) = value;
-    }
-
-    std::cout << "Slight Permutation (Matrix View):\n";
-    std::cout << stateMatrix << std::endl;
-}
-
-
 int main() {
     ModelBuilder modelBuilder("simulation_config.json");
 
-
-    // Loop through the simulation neighborhoods 
-    // Store the simulation results
-
-    modelBuilder.loadScenario() \
-                .loadImages() \
+    modelBuilder.loadImages() \
                 .initializeWeightMatrix() \
                 .initializeStateMatrix();
      
+    // Set globals to builder instance, REQUIRED for factory method
     globalStateMatrix = modelBuilder.globalStateMatrix;
     globalWeightMatrix = modelBuilder.globalWeightMatrix;
     images = modelBuilder.images;
+    imageSelection = modelBuilder.scenario.simulationDetails.imageSelectionIndex;
 
-    // printMatrix(images[0] -> pixels);
+    // Verify proper indexing
+    if (imageSelection > images.size()) {
+        std::cerr << "Error: Invalid Image Index in Simulation Config" << std::endl;
+        return 0;
+    }
 
+    // View Selection
+    std::cout << "Raw Image" << std::endl;
+    printMatrix(images[imageSelection] -> pixels);
+
+    // Add factory method to builder
     modelBuilder.buildNeuronCellModel(addGridCell)\
-    .buildLogger("hebbian_logfile");
+    .buildLogger("hebbian_logfile.csv");
 
-    // printMatrixi(globalStateMatrix->stateMatrix);
+    // View Matrix after mixing some bits
+    std::cout << "Image after altering some bits" << std::endl;
+    printMatrixi(globalStateMatrix->stateMatrix);
 
-    // printNeuronStatesMatrixStyle(modelBuilder.neuronCellModel, 28, 28);
-
+    // Build the root coordinator
     modelBuilder.buildRootCoordinator();
     // Start Simulation
     modelBuilder.startSimulation();
 
+    // View Simulation Result
+    std::cout << "Final Image recall" << std::endl;
     printMatrixi(globalStateMatrix->stateMatrix);
 
+    // Print experiment details
     auto finalEnergy = GeneralUtils::calculateEnergyCostFunction(globalWeightMatrix, globalStateMatrix);
     std::cout << "Energy: " << finalEnergy << " Type: " << modelBuilder.scenario.defaultCell.neighborhood[0].type << " Size: "  \
-    << modelBuilder.scenario.defaultCell.neighborhood[0].range << std::endl;
-
-    std::cout << "test" << std::endl;       
+    << modelBuilder.scenario.defaultCell.neighborhood[0].range << std::endl;    
 }
