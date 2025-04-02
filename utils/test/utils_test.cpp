@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
 #include "../imageLoader.hpp"
 
-/* Protocol Init Tests */
+/* Image Loader Test*/
 TEST(ImageLoader, TestImageloader) {
-    std::vector<std::vector<unsigned char>> imageSet = Utils::LoadImages();
+    int imageWidth = 28;
+    int imageLength = 28;
+    auto imageSet = ImageLoader::LoadImages(imageWidth, imageLength);
     ASSERT_TRUE(1);
 }
 

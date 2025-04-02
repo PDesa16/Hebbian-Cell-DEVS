@@ -2,202 +2,217 @@
 #define NEURON_CELL_HPP
 
 #include <cmath>
-#include <nlohmann/json.hpp>
+#include "neuronState.hpp"
+#include "../../types/imageStructures.hpp"
+#include "../../utils/generalUtils.hpp"
 #include <cadmium/celldevs/grid/cell.hpp>
 #include <cadmium/celldevs/grid/config.hpp>
-#include "neuronState.hpp"
-#include "../../utils/imageLoader.hpp"
 #include "../../utils/stochastic/random.hpp"
+#include <cstdlib> // For abs()
 
 using namespace cadmium::celldevs;
 
-int signum(float num) {  
-    return (num > 0) ? 1 : -1;
-}
-
-//! Conway game of life cell.
 class NeuronCell : public GridCell<NeuronState, double> {
-	public:
+public:
+    // Constructor
+    NeuronCell(const std::vector<int>& id, 
+               const std::shared_ptr<const GridCellConfig<NeuronState, double>>& config, 
+               int as, 
+               const std::shared_ptr<WeightMatrix> wm, 
+               const std::shared_ptr<StateMatrix> ns, 
+               int length, 
+               int width, 
+                double time): GridCell<NeuronState, double>(id, config) {
+                this->state.activationStatus = as;
+                this->state.localWeights = wm;
+                this->state.neighboringStates = ns;
+                this->state.imageLength = length;
+                this->state.imageWidth = width;
+                this->state.time = time;
+            }
+            
+            [[nodiscard]] NeuronState localComputation(NeuronState state,
+                const std::unordered_map<std::vector<int>, NeighborData<NeuronState, double>>& neighborhood) const {
+                if (state.time != 0) {
+                    // Get current coords
+                    auto [x, y] = GeneralUtils::stringToIndices(this->getId());
+                    // Update state
+                    updateCellState(x,y,neighborhood,state);
+                }
+                // ΔE=∣Ecurrent−E prev​∣
+                // Advance time
+                state.time += RandomNumberGeneratorDEVS::generateExponentialDelay(1);
+                // Return current state which is passed to neighbors ports
+                return state;
+            }
+
+            // [[nodiscard]] NeuronState localComputation(NeuronState state,
+            //     const std::unordered_map<std::vector<int>, NeighborData<NeuronState, double>>& neighborhood) const {
+            //         // Get current cell coords
+            //         auto [x, y] = GeneralUtils::stringToIndices(this->getId());
+                    
+            //         // Update cell state (modifies activationStatus)
+            //         updateCellState(x, y, neighborhood, state);
+
+            //         // Compute energy difference for convergence check
+            //         double E_prev = state.prevEnergy;
+            //         double E_current = 0.0;
+                    
+            //         for (const auto& [neighborId, neighborData] : neighborhood) {
+            //             int neighborFlatIndex = neighborId[0] * state.imageWidth + neighborId[1];
+            //             int selfFlatIndex = x * state.imageWidth + y;
+            //             E_current += -0.5 * state.localWeights->getWeightAt(selfFlatIndex, neighborFlatIndex) *
+            //                         state.activationStatus * neighborData.state->activationStatus;
+            //         }
+
+            //         // Store energy for next iteration
+            //         state.prevEnergy = E_current;
+
+            //         // Compute energy difference
+            //         double energyDiff = fabs(E_current - E_prev);
+                    
+            //         // Adaptive time update based on stability
+            //         state.time += (energyDiff < 0.001) ? 0.1 : 1.0;
+
+            //     return state;
+            // }
+
+            
+            bool verifyImmidiateNeighborsHaveFired(int x, int y, const std::unordered_map<std::vector<int>, NeighborData<NeuronState, double>>& neighborhood, NeuronState& state) const {
+                int WIDTH_EDGE = state.imageWidth - 1;
+                int LENGTH_EDGE = state.imageLength - 1;
+                // Right Nearest 
+                auto rightNearest = (x < WIDTH_EDGE)  ?  GeneralUtils::parseCellIndexToCadmiumId(x + 1, y) : "";
+                // Left Nearest 
+                auto leftNearest = (x > 0) ? GeneralUtils::parseCellIndexToCadmiumId(x - 1, y) : "";
+                // Top Nearest 
+                auto topNearest = (y > 0) ? GeneralUtils::parseCellIndexToCadmiumId(x , y - 1) : "";
+                // Bottom Nearest 
+                auto bottomNearest = (y < LENGTH_EDGE) ? GeneralUtils::parseCellIndexToCadmiumId(x , y + 1) : "";
+            
+                // Check if any of our immidiate neighbors are active.
+                bool isActive = false;
+                for (const auto& [neighborId, neighborData] : neighborhood) {
+                    int neighborState = neighborData.state->activationStatus;
+                    auto neighborStringID = GeneralUtils::parseCellIndexToCadmiumId(neighborId[0], neighborId[1]);
+                    if (neighborState == 1 && 
+                        (neighborStringID == rightNearest || neighborStringID == leftNearest || 
+                        neighborStringID == topNearest || neighborStringID == bottomNearest)) {
+                        isActive = true;
+                        break;
+                    }
+                }
+            
+                return isActive;
+            };
+
+            bool neighborhoodIsActive(const std::unordered_map<std::vector<int>, NeighborData<NeuronState, double>>& neighborhood) const {
+                bool isActive = false;
+                for (const auto& [neighborId, neighborData] : neighborhood) {
+                    int neighborState = neighborData.state->activationStatus;
+                    if (neighborState == 1) {
+                        isActive = true;
+                        break;
+                    }
+                }
+                return isActive;
+            }
+            
+            
+            // void updateCellState(int x, int y ,const std::unordered_map<std::vector<int>, NeighborData<NeuronState, double>>& neighborhood, NeuronState& state) const {
+            //     // NxN matrix 
+            //     // i.e row 0 represents the product of cell 0 with every other cell including itself. 
+            //     // Each column represents the other cell i.e col 1 = cell0 * cell1, col 2 = cell0 * cell2 ... etc
+            //     double sum = 0;
+            //     int selfFlatIndex = x * state.imageWidth + y;
+            //     // Iterate through neighboring neurons
+            //     for (const auto& [neighborId, neighborData] : neighborhood) {
+            //         int neighborState = neighborData.state->activationStatus;
+            
+            //         auto neighborStringID = GeneralUtils::parseCellIndexToCadmiumId(neighborId[0], neighborId[1]);
+            //         int neighborFlatIndex = neighborId[0] * state.imageWidth + neighborId[1];
+            
+            //         // Perform update rule
+            //         if (neighborStringID != this->getId()) {
+            //             sum += state.localWeights->getWeightAt(selfFlatIndex, neighborFlatIndex) * static_cast<double>(neighborState);
+            //         }
+            //     }
+            //     // Update activation state using the sum
+            //     state.activationStatus = GeneralUtils::signum(sum);
+            //     // Set it in the global state matrix
+            //     state.neighboringStates->stateMatrix(x,y) = state.activationStatus;
+            // }
+
+            // Adaptive Weights - Oja's
+            void updateCellState(int x, int y, 
+                const std::unordered_map<std::vector<int>, NeighborData<NeuronState, double>>& neighborhood, 
+                NeuronState& state) const {
+                double sum = 0.0;
+                int selfFlatIndex = x * state.imageWidth + y;
+                double lambda = 0.1;  // Learning rate for Hebbian update
+                double decayFactor = 0.99; // Decay weight over time
+
+                // Iterate through neighboring neurons
+                for (const auto& [neighborId, neighborData] : neighborhood) {
+                int neighborState = neighborData.state->activationStatus;
+                int neighborFlatIndex = neighborId[0] * state.imageWidth + neighborId[1];
+
+                if (neighborFlatIndex != selfFlatIndex) {
+                    // Fetch existing weight
+                    double currentWeight = state.localWeights->getWeightAt(selfFlatIndex, neighborFlatIndex);
+
+                    // Hebbian update with decay
+                    double updatedWeight = decayFactor * currentWeight + lambda * state.activationStatus * neighborState;
+
+                    // Normalize weight to prevent divergence
+                    updatedWeight /= std::max(1.0, fabs(updatedWeight));
+
+                    // Store updated weight
+                    state.localWeights->weightMatrix(selfFlatIndex, neighborFlatIndex) =  updatedWeight;
+
+                    // Sum for activation update
+                    sum += updatedWeight * neighborState;
+                }
+                }
+
+                // Update activation state using sign function
+                state.activationStatus = GeneralUtils::signum(sum);
+
+                // Store new state in the global state matrix
+                state.neighboringStates->stateMatrix(x, y) = state.activationStatus;
+                }
+            
+            [[nodiscard]] double outputDelay(const NeuronState& state) const {
+                return state.time;
+            }
+            
+            NeuronState& getState(){ return this->state; }
+        
+};
+
+#endif
 
 
-	NeuronCell(const std::vector<int>& id, 
-		const std::shared_ptr<const GridCellConfig<NeuronState, double>>& config, 
-		const int as, const std::shared_ptr<WeightVector> wm, const double time ) 
- 		: GridCell<NeuronState, double>(id, config){
-			this->state.activationStatus = as;
-			this->state.localWeights = wm;
-		}
 
-
-	// [[nodiscard]] NeuronState localComputation(NeuronState state,
-	// 	const std::unordered_map<std::vector<int>, NeighborData<NeuronState, double>>& neighborhood) const override {
-	// 	/* Calculate the neuron state */
-
-	// 	// Get the weight matrix for the area, say its a Von-Neumann, we have a 4x4 
-	// 	// Sum the state of nearby nodes with the connection weights of our current neuron 
-	// 	// If it has a positive coorelation the majority should be one
-
-	// 	// These weights are relative to the neuron and its connecting neurons
-	// 	// They are precomputed at the start of the simulation 
-	// 	// Here we are updating the energy wells
-
-	// 	int sum = 0;
-	// 	double energy = -1;
-
-	// 	std::cout << this->getId() << std::endl;
-
-	// 	// Iterate through neighboring neurons
-	// 	for (const auto& [neighborId, neighborData] : neighborhood) {
-	// 		Sign neighborState = neighborData.state->activationStatus;
-
-	// 		auto neighborStringID = "(" + std::to_string(neighborId[0]) + "," +  std::to_string(neighborId[1]) + ")";
-		
-	// 		if (neighborStringID != this->getId()) {
-	// 			sum += state.localWeights->vectorMap["[" + std::to_string(neighborId[0]) + "," +  std::to_string(neighborId[1]) + "]"] * static_cast<double>(neighborState);
-	// 		}
-	// 	}
-
-	// 	// Update activation state using the sign function
-	// 	state.activationStatus = signum(sum);
-
-	// 	// // Compute Energy Function
-	// 	// for (const auto& [neighborId, neighborData] : neighborhood) {
-	// 	// 	Sign neighborState = neighborData.state->activationStatus;
-	// 	// 	energy += state.localWeights->vectorMap["[" + std::to_string(neighborId[0]) + "," +  std::to_string(neighborId[1]) + "]"] * static_cast<double>(neighborState * state.activationStatus);
-	// 	// }
-
-	// 	// Update time step
-	// 	state.time += RandomNumberGeneratorDEVS::generateUniformDelay(0.1,0.5);
-	// 	// energy *= 0.5;
-
-	// 	if (energy == 0) {
-	// 		state.time = std::numeric_limits<double>::infinity();
-	// 	}
-
-	// 	return state;
-	// }
-
-	[[nodiscard]] NeuronState localComputation(NeuronState state,
-		const std::unordered_map<std::vector<int>, NeighborData<NeuronState, double>>& neighborhood) const override {
-		
-		// Get the weight matrix for the area (Von-Neumann neighborhood in this case)
-		int sum = 0;
-		double energy = -1;
-	
-		// std::cout << "Neuron ID: " << this->getId() << std::endl;
-
-		// Get immidiate neighbors, will use to trigger events
-		auto [index1, index2] = stringToIndices(this->getId());
-		// Right Nearest 
-		auto rightNearest = (index1 < 27)  ? "(" + std::to_string(index1 + 1) + "," + std::to_string(index2) + ")" : "";
-		// Left Nearest 
-		auto leftNearest = (index1 > 0) ? "(" + std::to_string(index1 - 1) + "," + std::to_string(index2) + ")" : "";
-		// Top Nearest 
-		auto topNearest = (index2 > 0) ? "(" + std::to_string(index1) + "," + std::to_string(index2 - 1) + ")" : "";
-		// Bottom Nearest 
-		auto bottomNearest = (index2 < 27) ? "(" + std::to_string(index1) + "," + std::to_string(index2 + 1) + ")" : "";
-
-		// Check if any of our immidiate neighbors are active. If so update...
 		// bool isActive = false;
+		// // Check if neighbors are valid.. 
 		// for (const auto& [neighborId, neighborData] : neighborhood) {
 		// 	int neighborState = neighborData.state->activationStatus;
-		// 	auto neighborStringID = "(" + std::to_string(neighborId[0]) + "," +  std::to_string(neighborId[1]) + ")";
-		// 	std::cout << "Right Nearest" << (neighborStringID == rightNearest ? "Valid" : "Invalid") << std::endl;
-		// 	std::cout << "Left Nearest" << (neighborStringID == leftNearest ? "Valid" : "Invalid") << std::endl;
-		// 	std::cout << "Top Nearest" << (neighborStringID == topNearest ? "Valid" : "Invalid") << std::endl;
-		// 	std::cout << "Bottom Nearest" << (neighborStringID == bottomNearest ? "Valid" : "Invalid") << std::endl;
-
-		// 	std::cout << "Firing state: " << std::to_string(neighborState) << std::endl;
-
-
-   		// 	if (neighborState == 1) {
-		// 		std::cout << "Firing Near me" << std::endl;
-		// 	}
-
-			
-
-		// 	if ( (neighborStringID == rightNearest) && (neighborState == 1)) {
-		// 		isActive = true ;
-		// 		break;
-		// 	}
-
-		// 	if ((neighborStringID == leftNearest) && (neighborState == 1)) {
-		// 		isActive = true ;
-		// 		break;
-		// 	}
-
-		// 	if ((neighborStringID == topNearest) && (neighborState == 1)) {
-		// 		isActive = true ;
-		// 		break;
-		// 	}
-
-		// 	if ((neighborStringID == bottomNearest) && (neighborState == 1)) {
-		// 		isActive = true ;
+		// 	if ( neighborState == 1 ) {
+		// 		isActive = true;
 		// 		break;
 		// 	}
 		// }
 
 		// if (isActive == false) {
 		// 	return state;
+		//  }
+
+
+		// for (int i =0; i < 28; i++){
+		// 	for (int j =0; j < 28; j++){
+		// 		sum += state.localWeights->weightMatrix[selfFlatIndex][i*28 + j] * (*state.neighboringStates)[i][j];
+		// 	}
 		// }
 
-		// Iterate through neighboring neurons
-		for (const auto& [neighborId, neighborData] : neighborhood) {
-			int neighborState = neighborData.state->activationStatus;
-	
-			auto neighborStringID = "(" + std::to_string(neighborId[0]) + "," +  std::to_string(neighborId[1]) + ")";
-	
-			// Check if the current neuron is receiving activation from a neighbor in order
-			if (neighborStringID != this->getId()) {
-				// // Only activate if the left or top neighbor has fired
-				sum += state.localWeights->vectorMap["[" + std::to_string(neighborId[0]) + "," +  std::to_string(neighborId[1]) + "]"] * static_cast<double>(neighborState);
-			}
-		}
-	
-		// Update activation state using the sum
-		state.activationStatus = signum(sum);
-	
-		// Compute Energy Function (if needed)
-		for (const auto& [neighborId, neighborData] : neighborhood) {
-			int neighborState = neighborData.state->activationStatus;
-			energy += state.localWeights->vectorMap["[" + std::to_string(neighborId[0]) + "," +  std::to_string(neighborId[1]) + "]"] * static_cast<double>(neighborState * state.activationStatus);
-		}
-	
-		// Add randomness to the time delay between activations
-		state.time += 0.0001;
-	
-		// // // If energy is zero, stop the process (or set to infinity)
-		// if (energy == 0) {
-		// 	state.time = std::numeric_limits<double>::infinity();
-		// }
-	
-		return state;
-	}
-	
-
-	[[nodiscard]] double outputDelay(const NeuronState& state) const override {
-		return state.time;
-	}
-	
-	NeuronState& getState(){
-		return this->state;
-	}
-
-	std::tuple<int, int> stringToIndices(const std::string& neighborStringID) const {
-		// Remove the parentheses and split by the comma
-		std::string stripped = neighborStringID.substr(1, neighborStringID.size() - 2);  // Remove "(" and ")"
-		
-		std::stringstream ss(stripped);
-		int index1, index2;
-	
-		// Extract the two integers separated by the comma
-		char comma;  // To discard the comma
-		ss >> index1 >> comma >> index2;
-	
-		return std::make_tuple(index1, index2);
-	}
-
-};
-
-
-#endif 
+		// (*state.neighboringStates)[index1][index2] =  state.activationStatus;

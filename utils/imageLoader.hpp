@@ -11,11 +11,11 @@
 #include <vector>
 #include <string>
 
-namespace fs = std::filesystem;  // Use filesystem namespace
+namespace fs = std::filesystem; 
 
-class Utils {
+class ImageLoader {
 public:
-    static std::vector<std::vector<std::vector<unsigned char>>> LoadImages() {
+    static std::vector<std::vector<std::vector<unsigned char>>> LoadImages(int imageWidthDesired, int imageLengthDesired) {
         std::vector<std::vector<std::vector<unsigned char>>> imageSet;
         std::string directoryPath = "images";  
 
@@ -36,7 +36,7 @@ public:
                     continue;
                 }
     
-                unsigned char* resizedImage = resizeImage(image, width, height, 28, 28);
+                unsigned char* resizedImage = resizeImage(image, width, height, imageWidthDesired , imageLengthDesired);
                 
                 if (!resizedImage) {
                     std::cerr << "Error: Could not resize " << filePath << std::endl;
@@ -44,7 +44,7 @@ public:
                     continue;
                 }
 
-                auto imageMatrix = ToMatrix(resizedImage, 28, 28);
+                auto imageMatrix = ToMatrix(resizedImage, imageWidthDesired, imageLengthDesired);
                 imageSet.push_back(imageMatrix);
 
                 free(resizedImage); 
