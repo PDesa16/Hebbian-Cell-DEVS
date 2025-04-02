@@ -15,7 +15,7 @@ cd Hebbian-Cell-DEVS
 ```
 ## Give Permissions to the Build Script
 ```sh
-chmod 755 build_script.sh
+chmod 755 build_dependencies.sh
 ```
 
 
