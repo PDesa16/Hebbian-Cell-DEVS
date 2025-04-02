@@ -1,3 +1,6 @@
+## Demo  
+![Demo GIF](https://github.com/PDesa16/RAFT-DEVS/blob/main/assets/demo.gif)
+
 # Project Setup and Usage
 
 ## Cloning the Repository
